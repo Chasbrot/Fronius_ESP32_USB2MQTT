@@ -3,7 +3,7 @@ Simulates a usb drive with a SD card to collect the log files from a fronius sol
 
 ## Parts
 - ESP32S2
-- https://www.waveshare.com/wiki/ESP32-S2-Pico
+- Mine (without display): https://www.waveshare.com/wiki/ESP32-S2-Pico
 - Some SD Card adapter breakout board
 - SD Card, any size is ok. I used an old 1GB, really doesn't matter.
 - A Fronius Inverter, I have a Symo model. If you have a other model, please check the file and directory names.
