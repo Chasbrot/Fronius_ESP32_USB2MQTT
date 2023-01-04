@@ -96,21 +96,21 @@ void setup()
 void loop()
 {
   // Wifi Stuff
-
   if (!client.connected()) {
     reconnect();
-    strip.setLedColorData(0, 0, 0, 255); // Green
+    strip.setLedColorData(0, 0, 0, 255); // Blue
     strip.show();
   }
   client.loop();
 
-  // Deactivate led
-  strip.setLedColorData(0, 0, 0, 0); // Green
-  strip.show();
 
   // Main program check every 10s
   long now = millis();
   if (now - lastMsg > 10000) {
+    // Deactivate led
+    strip.setLedColorData(0, 255, 255, 0); // Yellow
+    strip.show();
+
     lastMsg = now;
 
     // Check if file exists
