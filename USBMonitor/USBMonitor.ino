@@ -6,7 +6,6 @@
 #include <SD.h>
 #include "Freenove_WS2812_Lib_for_ESP32.h"
 
-
 // SD Card
 #define SD_MISO  37
 #define SD_MOSI  35
@@ -15,17 +14,15 @@
 SDCard2USB dev;
 
 // Networking
-const char* ssid = "WIFI_SSID";				//-- REPLACE WITH YOUR VALUES
-const char* password = "WIFI_PASSWORD"; 	//-- REPLACE WITH YOUR VALUES
-const char* mqtt_server = "MQTT_IP"; 		//-- REPLACE WITH YOUR VALUES
+const char* ssid = "INSERT_YOUR_DATA";          //-- REPLACE WITH YOUR VALUES
+const char* password = "INSERT_YOUR_DATA";      //-- REPLACE WITH YOUR VALUES
+const char* mqtt_server = "INSERT_YOUR_DATA";   //-- REPLACE WITH YOUR VALUES
 const char* mqtt_cname = "froniusclient";
-const char* mqtt_user = "MQTT_USER";		//-- REPLACE WITH YOUR VALUES
-const char* mqtt_pw = "MQTT_PW";			//-- REPLACE WITH YOUR VALUES
+const char* mqtt_user = "INSERT_YOUR_DATA";     //-- REPLACE WITH YOUR VALUES
+const char* mqtt_pw = "INSERT_YOUR_DATA";       //-- REPLACE WITH YOUR VALUES
 WiFiClient espClient;
 PubSubClient client(espClient);
 long lastMsg = 0;
-char msg[50];
-int value = 0;
 
 // Program Variables
 #define FRONIUS_LOG "/SYMO/01/DATA.CSV"
@@ -34,12 +31,16 @@ long last_log_size = 0;
 // --  Inverter Data
 int currentDay = 0;
 float energyToday = 0.0;
-float currentVolts = 0.0;
-float currentAmps = 0.0;
+float dcVoltage = 0.0;
+float dcCurrent = 0.0;
 long logPeriod = 0.0;
+float acVarL = 0.0;
+float acVarC = 0.0;
+float acVoltage[] = {0.0, 0.0, 0.0};
+float acCurrent[] = {0.0, 0.0, 0.0};
 
-// LED BUILT-IN
-#define LEDS_COUNT  1 
+// LED
+#define LEDS_COUNT  1
 #define LEDS_PIN  9
 #define CHANNEL   0
 Freenove_ESP32_WS2812 strip = Freenove_ESP32_WS2812(LEDS_COUNT, LEDS_PIN, CHANNEL, TYPE_GRB);
@@ -51,7 +52,7 @@ void setup()
 
   // Start led
   strip.begin();
-  strip.setBrightness(10);  
+  strip.setBrightness(10);
   strip.setLedColorData(0, 255, 0, 0); // RED
   strip.show();
 
@@ -97,9 +98,9 @@ void loop()
 {
   // Wifi Stuff
   if (!client.connected()) {
-    reconnect();
     strip.setLedColorData(0, 0, 0, 255); // Blue
     strip.show();
+    reconnect();
   }
   client.loop();
 
@@ -107,10 +108,6 @@ void loop()
   // Main program check every 10s
   long now = millis();
   if (now - lastMsg > 10000) {
-    // Deactivate led
-    strip.setLedColorData(0, 255, 255, 0); // Yellow
-    strip.show();
-
     lastMsg = now;
 
     // Check if file exists
@@ -131,6 +128,9 @@ void loop()
       return;
     }
     Serial.println("File changed");
+    // Set LED Yellow
+    strip.setLedColorData(0, 255, 255, 0); // Yellow
+    strip.show();
 
     // Check if file is too big
     // file.read only addresses uint16 -> max. 32767 Chars per file
@@ -139,7 +139,8 @@ void loop()
       Serial.println("File too big -> clearing");
       file.close();
       SD.remove(FRONIUS_LOG);
-      SD.open(FRONIUS_LOG, FILE_WRITE);
+      file = SD.open(FRONIUS_LOG, FILE_WRITE);
+      file.close();
       last_log_size = 0;
       return;
     }
@@ -203,15 +204,15 @@ void loop()
     Serial.print("Energy produced today: ");
     Serial.println(energyToday);
     Serial.print("DC Volts: ");
-    Serial.println(currentVolts);
+    Serial.println(dcVoltage);
     Serial.print("DC Amps: ");
-    Serial.println(currentAmps);
+    Serial.println(dcCurrent);
     Serial.print("DC Power: ");
-    Serial.println(currentAmps * currentVolts);
+    Serial.println(dcCurrent * dcVoltage);
     Serial.print("Log Intervall: ");
     Serial.println(logPeriod);
 
-    Serial.println("- Publishing to MQTT");
+    Serial.println("Publishing to MQTT");
     publishToMQTT();
     strip.setLedColorData(0, 0, 255, 0); // Green
     strip.show();
@@ -222,10 +223,22 @@ void loop()
 }
 
 void publishToMQTT() {
-  pub("espfronius/energy", String(energyToday/3600/1000)); // Map Ws to kWh
-  pub("espfronius/dcvolts", String(currentVolts));
-  pub("espfronius/dcamps", String(currentAmps));
-  pub("espfronius/dcwatts", String(currentVolts * currentAmps));
+  pub("espfronius/energy", String(energyToday / 3600 / 1000)); // Map Ws to kWh
+  pub("espfronius/acvarl", String(acVarL));
+  pub("espfronius/acvarc", String(acVarC));
+  pub("espfronius/acvoltage1", String(acVoltage[0]));
+  pub("espfronius/acvoltage2", String(acVoltage[1]));
+  pub("espfronius/acvoltage3", String(acVoltage[2]));
+  pub("espfronius/accurrent1", String(acCurrent[0]));
+  pub("espfronius/accurrent2", String(acCurrent[1]));
+  pub("espfronius/accurrent3", String(acCurrent[2]));
+  pub("espfronius/acwatts1", String(acVoltage[0]*acCurrent[0]));
+  pub("espfronius/acwatts2", String(acVoltage[1]*acCurrent[1]));
+  pub("espfronius/acwatts3", String(acVoltage[2]*acCurrent[2]));
+  pub("espfronius/acwatts", String((acVoltage[0]*acCurrent[0])+(acVoltage[1]*acCurrent[1])+(acVoltage[2]*acCurrent[2])));
+  pub("espfronius/dcvolts", String(dcVoltage));
+  pub("espfronius/dcamps", String(dcCurrent));
+  pub("espfronius/dcwatts", String(dcVoltage * dcCurrent));
 }
 
 void pub(char* topic, String str) {
@@ -290,7 +303,7 @@ bool parseLine(String line) {
           break;
         case 4: // LogPeriod
           logPeriod = parseSN(rc);
-          if (logPeriod == 0) {
+          if (logPeriod == 0) { // If no log period then no data
             return false;
           }
           break;
@@ -301,11 +314,35 @@ bool parseLine(String line) {
           EEPROM.write(1, energyToday); // Save daily energy production
           EEPROM.end();
           break;
+        case 6: // Reactive Power Inductive
+          acVarL = parseSN(rc);
+          break;
+        case 7: // Reactive Power Capacitive
+          acVarC = parseSN(rc);
+          break;
+        case 8: // AC Voltage Phase 1
+          acVoltage[0] = parseSN(rc);
+          break;
+        case 9: // AC Voltage Phase 2
+          acVoltage[1] = parseSN(rc);
+          break;
+        case 10: // AC Voltage Phase 3
+          acVoltage[2] = parseSN(rc);
+          break;
+        case 11: // AC Current Phase 1
+          acCurrent[0] = parseSN(rc);
+          break;
+        case 12: // AC Current Phase 2
+          acCurrent[1] = parseSN(rc);
+          break;
+        case 13: // AC Current Phase 3
+          acCurrent[2] = parseSN(rc);
+          break;
         case 14: // Solar Volts
-          currentVolts = parseSN(rc);
+          dcVoltage = parseSN(rc);
           break;
         case 15: // Solar Amps
-          currentAmps = parseSN(rc);
+          dcCurrent = parseSN(rc);
           break;
       }
       i++;
