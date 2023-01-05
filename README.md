@@ -17,5 +17,11 @@ I know, i am not the greatest picasso.
 --DON'T FORGET TO INSERT YOUR WIFI AND MQTT DATA!--<br>
 Takes forever. Just wait. You need the ESP32TinyUSB library, available in the library manager. For the board I used the ESP32S2 Dev Module. Everything default.
 
+## LED Colors
+- Blue: Wifi Stuff
+- Red: Booting
+- Green: Running
+- Yellow: Parsing Data
+
 ## Known Bugs
 1. Doesn't work under windows, because the filesystem gets corrupted. As always windows is at fault.
