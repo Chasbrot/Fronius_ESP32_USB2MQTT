@@ -45,6 +45,12 @@ float acCurrent[] = {0.0, 0.0, 0.0};
 #define CHANNEL   0
 Freenove_ESP32_WS2812 strip = Freenove_ESP32_WS2812(LEDS_COUNT, LEDS_PIN, CHANNEL, TYPE_GRB);
 
+// EEPROM Memory Regions
+#define EEPROM_DAY 0                    // Memory location where day is saved
+#define EEPROM_OFFSET_LOCATION 1        // Memory location where the address of the daily production is saved
+#define EEPROM_RANGE_START 10           // Start of the wear leveling range
+#define EEPROM_RANGE_END   200          // End of the wear levenling range
+uint8_t eeprom_current_offset = 0;      // Current address of the daily production
 
 void setup()
 {
@@ -69,11 +75,15 @@ void setup()
   //clearSD();
 
   // Init data from eeprom
-  EEPROM.begin(2);
-  currentDay = EEPROM.read(0);
-  energyToday = EEPROM.read(1);
+  EEPROM.begin(3);
+  currentDay = EEPROM.read(EEPROM_DAY);
+  eeprom_current_offset=EEPROM.read(EEPROM_OFFSET_LOCATION);
+  if(eeprom_current_offset >= EEPROM_RANGE_END){
+    eeprom_current_offset=EEPROM_RANGE_START;
+  }
+  energyToday = EEPROM.read(eeprom_current_offset);
   EEPROM.end();
-
+  
   // Setup Wifi
   strip.setLedColorData(0, 0, 0, 255); // BLUE
   strip.show();
@@ -294,9 +304,14 @@ bool parseLine(String line) {
             Serial.println("-- New day");
             currentDay = cd;
             // Save to eeprom
-            EEPROM.begin(2);
-            EEPROM.write(0, currentDay); // Save current day
-            EEPROM.write(1, 0); // Reset daily energy production
+            EEPROM.begin(3);
+            EEPROM.write(EEPROM_DAY, currentDay); // Save current day
+            eeprom_current_offset++;
+            if(eeprom_current_offset >= EEPROM_RANGE_END){
+              eeprom_current_offset=EEPROM_RANGE_START;
+            }
+            EEPROM.write(EEPROM_OFFSET_LOCATION,eeprom_current_offset);            
+            EEPROM.write(eeprom_current_offset, 0); // Reset daily energy production
             EEPROM.end();
             energyToday = 0.0;
           }
@@ -311,7 +326,7 @@ bool parseLine(String line) {
           energyToday += parseSN(rc);
           // Save to eeprom
           EEPROM.begin(2);
-          EEPROM.write(1, energyToday); // Save daily energy production
+          EEPROM.write(eeprom_current_offset, energyToday); // Save daily energy production
           EEPROM.end();
           break;
         case 6: // Reactive Power Inductive
